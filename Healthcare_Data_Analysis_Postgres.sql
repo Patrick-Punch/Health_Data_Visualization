@@ -1,8 +1,16 @@
--- How many encounters did we have before the year 2022?
+-- How many encounters did we have before the year 2020?
+
+SELECT COUNT(*)
+FROM flu_demo_data
+WHERE earliest_flu_shot_2022 < '2020-01-01';
 
 SELECT COUNT(*)
 FROM healthcare_demo_data 
-where start_day < '2022-01-01';
+WHERE start_day < '2020-01-01';
+
+SELECT COUNT(*)
+FROM hospital_er
+WHERE date < '2020-01-01';
 
 SELECT COUNT(*) 
 FROM (
@@ -13,11 +21,11 @@ FROM (
     SELECT 1 FROM hospital_er WHERE date < '2020-01-01'
 ) AS combined_counts;
 
--- How many distinct patients did we treat before the year 2022?
+-- How many distinct patients did we treat before the year 2020?
 
 SELECT COUNT(DISTINCT patient_id)
-FROM healthcare_demo_data 
-WHERE start_day < '2022-01-01';
+FROM hospital_er
+WHERE date < '2020-01-01';
 
 -- How many distinct encounter classes are documented in the healthcare_demo_data table?
 SELECT COUNT(DISTINCT encounter_class)
@@ -30,57 +38,146 @@ WHERE start_day < '2022-01-01' AND encounter_class IN ('inpatient', 'ambulatory'
 
 -- What is our patient mix by gender, race and ethnicity?
 SELECT gender, race, ethnicity, COUNT(*) AS num
-FROM healthcare_demo_data
+FROM flu_demo_data
 GROUP BY gender, race, ethnicity;
 
 -- What about age?
-
-SELECT id, birthdate, deathdate,
+SELECT 
     CASE 
-        WHEN deathdate IS NULL THEN FLOOR(EXTRACT(DAY FROM CURRENT_DATE - birthdate) / 365)
-        ELSE FLOOR(EXTRACT(DAY FROM deathdate - birthdate) / 365)
-    END AS age
-FROM Healthcare.patients;
+        WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) < 18 THEN '0-17'
+        WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) BETWEEN 18 AND 34 THEN '18-34'
+        WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) BETWEEN 35 AND 49 THEN '35-49'
+        WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) BETWEEN 50 AND 64 THEN '50-64'
+        ELSE '65+' 
+    END AS age_group,
+    COUNT(*) AS healthcare_patient_count
+FROM healthcare_demo_data
+GROUP BY age_group
+ORDER BY age_group;
 
+SELECT 
+    CASE 
+        WHEN age < 18 THEN '0-17'
+        WHEN age BETWEEN 18 AND 34 THEN '18-34'
+        WHEN age BETWEEN 35 AND 49 THEN '35-49'
+        WHEN age BETWEEN 50 AND 64 THEN '50-64'
+        ELSE '65+' 
+    END AS age_group,
+    COUNT(*) AS flu_patient_count
+FROM flu_demo_data
+GROUP BY age_group
+ORDER BY age_group;
+
+SELECT 
+    CASE 
+        WHEN patient_age < 18 THEN '0-17'
+        WHEN patient_age BETWEEN 18 AND 34 THEN '18-34'
+        WHEN patient_age BETWEEN 35 AND 49 THEN '35-49'
+        WHEN patient_age BETWEEN 50 AND 64 THEN '50-64'
+        ELSE '65+' 
+    END AS age_group,
+    COUNT(*) AS er_patient_count
+FROM hospital_er
+GROUP BY age_group
+ORDER BY age_group;
+
+
+
+SELECT 
+    age_brackets.age_group,
+    COALESCE(healthcare_data.healthcare_patient_count, 0) AS healthcare_patient_count,
+    COALESCE(flu_data.flu_patient_count, 0) AS flu_patient_count,
+    COALESCE(er_data.er_patient_count, 0) AS er_patient_count
+FROM (
+    SELECT '0-17' AS age_group UNION ALL
+    SELECT '18-34' UNION ALL
+    SELECT '35-49' UNION ALL
+    SELECT '50-64' UNION ALL
+    SELECT '65+' 
+) AS age_brackets
+LEFT JOIN (
+    SELECT 
+        CASE 
+            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) < 18 THEN '0-17'
+            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) BETWEEN 18 AND 34 THEN '18-34'
+            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) BETWEEN 35 AND 49 THEN '35-49'
+            WHEN EXTRACT(YEAR FROM AGE(CURRENT_DATE, birthdate)) BETWEEN 50 AND 64 THEN '50-64'
+            ELSE '65+' 
+        END AS age_group,
+        COUNT(*) AS healthcare_patient_count
+    FROM healthcare_demo_data
+    GROUP BY age_group
+) AS healthcare_data ON healthcare_data.age_group = age_brackets.age_group
+LEFT JOIN (
+    SELECT 
+        CASE 
+            WHEN age < 18 THEN '0-17'
+            WHEN age BETWEEN 18 AND 34 THEN '18-34'
+            WHEN age BETWEEN 35 AND 49 THEN '35-49'
+            WHEN age BETWEEN 50 AND 64 THEN '50-64'
+            ELSE '65+' 
+        END AS age_group,
+        COUNT(*) AS flu_patient_count
+    FROM flu_demo_data
+    GROUP BY age_group
+) AS flu_data ON flu_data.age_group = age_brackets.age_group
+LEFT JOIN (
+    SELECT 
+        CASE 
+            WHEN patient_age < 18 THEN '0-17'
+            WHEN patient_age BETWEEN 18 AND 34 THEN '18-34'
+            WHEN patient_age BETWEEN 35 AND 49 THEN '35-49'
+            WHEN patient_age BETWEEN 50 AND 64 THEN '50-64'
+            ELSE '65+' 
+        END AS age_group,
+        COUNT(*) AS er_patient_count
+    FROM hospital_er
+    GROUP BY age_group
+) AS er_data ON er_data.age_group = age_brackets.age_group
+ORDER BY age_brackets.age_group;
 -- How many states and zip codes do we treat patients from?
 
 SELECT COUNT(DISTINCT state)
-FROM Healthcare.patients;
+FROM flu_demo_data;
 
 SELECT COUNT(DISTINCT zip)
-FROM Healthcare.patients;
+FROM flu_demo_data;
 
 SELECT DISTINCT zip, COUNT(*)
-FROM Healthcare.patients
+FROM flu_demo_data
 GROUP BY zip;
 
 -- Which county had the highest number of patients?
 
 SELECT county, COUNT(*) AS num
-FROM Healthcare.patients
+FROM flu_demo_data
 GROUP BY county
 ORDER BY COUNT(*) DESC;
 
 -- What is our patient mix for patients who had an inpatient encounter in 2019?
 
 SELECT gender, race, ethnicity, COUNT(*) AS num
-FROM Healthcare.encounters E
-JOIN Healthcare.patients P ON E.patient = P.id
-WHERE start >= '2019-01-01' AND start < '2020-01-01' AND encounterclass = 'inpatient'
+FROM healthcare_demo_data E
+JOIN flu_demo_data P ON E.encounter_id = P.id
+WHERE E.start_day >= '2019-01-01' AND E.start_day < '2020-01-01' AND E.encounter_class = 'inpatient'
 GROUP BY gender, race, ethnicity;
 
 -- How many inpatient encounters did we have in the entire dataset where the patient was at least 21 years old at the time of the encounter start?
 
 SELECT COUNT(*) AS num
-FROM Healthcare.encounters E
-JOIN Healthcare.patients P ON E.patient = P.id
+FROM healthcare_demo_data E
+JOIN er_data P ON E.encounter_id = P.id
 WHERE encounterclass = 'inpatient' AND FLOOR(EXTRACT(DAY FROM start - birthdate) / 365) >= 21;
 
 -- How many emergency encounters did we have in 2019?
 
 SELECT COUNT(*) AS er_num
-FROM Healthcare.encounters
-WHERE start >= '2019-01-01' AND start < '2020-01-01' AND encounterclass = 'emergency';
+FROM hospital_er
+WHERE date >= '2019-01-01' AND date < '2020-01-01';
+
+SELECT COUNT(*) AS er_num
+FROM healthcare_demo_data
+WHERE start_day >= '2019-01-01' AND start_day < '2020-01-01' AND encounter_class = 'emergency';
 
 -- What conditions were treated in those encounters?
 
