@@ -75,6 +75,8 @@ In this healthcare analytics project, I build some dashoboards in tableau for fl
 
 [View Emergency Room Visit Dashboard](https://public.tableau.com/app/profile/patrick.punch/viz/ERDashboard_17413037486100/Dashboard1)
 
+[View Patient Satisfaction Dashboard](https://public.tableau.com/app/profile/patrick.punch/viz/Book1_17416531260020/HCAHPSDashboard)
+
 [View Hospital Encounter Dashboard 1](https://public.tableau.com/app/profile/patrick.punch/viz/HospitalEncounterDashboard1/Dashboard1)
 
 [View Hospital Encounter Dashboard 2](https://public.tableau.com/app/profile/patrick.punch/viz/HospitalEncounterDashboard2/Dashboard2)
